@@ -234,9 +234,12 @@ def analyze_video():
             
             # Actualizar el registro existente en Supabase
             try:
-                # Buscar el video por su URL original
+                # Buscar el video por su URL original y actualizar el resultado y estado
                 data, error = supabase.table('videos') \
-                    .update({"analysis_result": results}) \
+                    .update({
+                        "analysis_result": results,
+                        "status": "completed"
+                    }) \
                     .eq('original_url', video_url) \
                     .execute()
                 
@@ -246,6 +249,14 @@ def analyze_video():
                     print(f"No se encontró el video con URL: {video_url}")
             except Exception as e:
                 print(f"Error al interactuar con Supabase: {str(e)}")
+                # Intentar actualizar solo el estado a fallido
+                try:
+                    supabase.table('videos') \
+                        .update({"status": "failed"}) \
+                        .eq('original_url', video_url) \
+                        .execute()
+                except:
+                    pass
             
             # Limpiar el archivo temporal
             os.remove(filepath)
@@ -256,11 +267,28 @@ def analyze_video():
                 "analysis": results
             })
         except Exception as e:
+            # En caso de error en el análisis, actualizar el estado a fallido
+            try:
+                supabase.table('videos') \
+                    .update({"status": "failed"}) \
+                    .eq('original_url', video_url) \
+                    .execute()
+            except:
+                pass
+            
             # Limpiar el archivo temporal en caso de error
             if os.path.exists(filepath):
                 os.remove(filepath)
             return jsonify({"error": f"Analysis error: {str(e)}"}), 500
     except Exception as e:
+        # En caso de error al descargar, actualizar el estado a fallido
+        try:
+            supabase.table('videos') \
+                .update({"status": "failed"}) \
+                .eq('original_url', video_url) \
+                .execute()
+        except:
+            pass
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
