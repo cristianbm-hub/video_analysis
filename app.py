@@ -256,6 +256,9 @@ def analyze_video():
             
             # Actualizar el registro existente en Supabase
             try:
+                logger.info(f"Intentando actualizar video con ID: {video_id}")
+                logger.info(f"Datos a actualizar: {json.dumps({'analysis_result': results, 'status': 'completed'})}")
+                
                 # Actualizar el registro con el resultado del análisis
                 data, error = supabase.table('videos') \
                     .update({
@@ -267,18 +270,45 @@ def analyze_video():
                 
                 if error:
                     logger.error(f"Error al actualizar en Supabase: {error}")
-                elif not data[1] or len(data[1]) == 0:
-                    logger.error(f"No se encontró el video con ID: {video_id}")
+                    # Intentar actualizar solo el estado a fallido
+                    try:
+                        logger.info("Intentando actualizar solo el estado a fallido")
+                        data, error = supabase.table('videos') \
+                            .update({"status": "failed"}) \
+                            .eq('id', video_id) \
+                            .execute()
+                        if error:
+                            logger.error(f"Error al actualizar estado a fallido: {error}")
+                    except Exception as e:
+                        logger.error(f"Error al intentar actualizar estado a fallido: {str(e)}")
+                else:
+                    logger.info(f"Actualización exitosa en Supabase. Respuesta: {json.dumps(data)}")
+                    if not data or len(data) == 0:
+                        logger.warning(f"No se encontró el video con ID: {video_id}")
+                        # Intentar actualizar solo el estado a fallido
+                        try:
+                            logger.info("Intentando actualizar solo el estado a fallido")
+                            data, error = supabase.table('videos') \
+                                .update({"status": "failed"}) \
+                                .eq('id', video_id) \
+                                .execute()
+                            if error:
+                                logger.error(f"Error al actualizar estado a fallido: {error}")
+                        except Exception as e:
+                            logger.error(f"Error al intentar actualizar estado a fallido: {str(e)}")
             except Exception as e:
                 logger.error(f"Error al interactuar con Supabase: {str(e)}")
                 # Intentar actualizar solo el estado a fallido
                 try:
-                    supabase.table('videos') \
+                    logger.info("Intentando actualizar solo el estado a fallido")
+                    data, error = supabase.table('videos') \
                         .update({"status": "failed"}) \
                         .eq('id', video_id) \
                         .execute()
-                except:
-                    pass
+                    if error:
+                        logger.error(f"Error al actualizar estado a fallido: {error}")
+                except Exception as e:
+                    logger.error(f"Error al intentar actualizar estado a fallido: {str(e)}")
             
             # Limpiar el archivo temporal
             os.remove(filepath)
