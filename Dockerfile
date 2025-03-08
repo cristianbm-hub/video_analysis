@@ -22,8 +22,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el código de la aplicación
 COPY . .
 
+# Configurar el PYTHONPATH
+ENV PYTHONPATH=/app
+
 # Exponer el puerto que usa la aplicación
 EXPOSE 5000
 
 # Comando para ejecutar la aplicación con Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "--chdir", "/app", "--bind", "0.0.0.0:5000", "app:app"]
