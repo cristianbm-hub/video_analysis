@@ -209,6 +209,18 @@ def analyze_video_quality(video_path):
     }
 """
 
+def extract_video_url(webhook_data):
+    """Extrae la URL del video desde los datos del webhook de Supabase Storage"""
+    try:
+        tenant_id = webhook_data['metadata'][0]['tenantId']
+        object_path = webhook_data['metadata'][0]['objectPath']
+        
+        # Construir la URL pública de Supabase Storage
+        video_url = f"https://{tenant_id}.supabase.co/storage/v1/object/public/{object_path}"
+        
+        return video_url
+    except Exception as e:
+        raise Exception(f"Error extracting video URL: {str(e)}")
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -290,6 +302,37 @@ def analyze_video():
         except:
             pass
         return jsonify({"error": str(e)}), 400
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    try:
+        webhook_data = request.json
+        
+        # Verificar si es un evento de creación de objeto
+        if webhook_data['metadata'][0]['event'] != 'ObjectCreated:Post':
+            return jsonify({"status": "ignored", "message": "Not a file creation event"}), 200
+        
+        # Extraer la URL del video
+        video_url = extract_video_url(webhook_data)
+        
+        # Iniciar el análisis del video
+        # Crear un nuevo registro en la tabla de videos
+        data, error = supabase.table('videos').insert({
+            "original_url": video_url,
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat(),
+            "webhook_data": webhook_data
+        }).execute()
+        
+        if error:
+            return jsonify({"error": str(error)}), 500
+        
+        # Iniciar el análisis del video de forma asíncrona
+        # Por ahora, lo hacemos de forma síncrona
+        return analyze_video({"video_url": video_url})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
