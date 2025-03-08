@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from supabase import create_client, Client
 from datetime import datetime
+import json
 
 # Configuración de Supabase
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -218,11 +219,19 @@ def health_check():
 def analyze_video():
     data = request.json
     
-    # Verificar si hay una URL en la solicitud
-    if not data or 'video_url' not in data:
-        return jsonify({"error": "No video URL provided"}), 400
+    # Verificar si los datos tienen el formato correcto de Supabase
+    if not data or 'metadata' not in data or not data['metadata'] or 'objectPath' not in data['metadata'][0]:
+        return jsonify({"error": "Formato de datos inválido"}), 400
     
-    video_url = data['video_url']
+    # Extraer el path del objeto del video y el proyecto
+    full_object_path = data['metadata'][0]['objectPath']
+    project_id = data['metadata'][0]['project']
+    
+    # Eliminar el ID del proyecto del object_path solo para la URL
+    url_path = full_object_path.replace(f"{project_id}/", "", 1)
+    
+    # Construir la URL completa del video usando el formato correcto de Supabase
+    video_url = f"https://{project_id}.supabase.co/storage/v1/object/public/{url_path}"
     
     try:
         # Descargar el video
