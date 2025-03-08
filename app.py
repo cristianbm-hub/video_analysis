@@ -235,18 +235,16 @@ def analyze_video():
     data = request.json
     
     # Verificar si los datos tienen el formato correcto de Supabase
-    if not data or 'metadata' not in data or not data['metadata'] or 'objectPath' not in data['metadata'][0]:
+    if not data or 'type' not in data or data['type'] != 'INSERT' or 'record' not in data:
         return jsonify({"error": "Formato de datos inválido"}), 400
     
-    # Extraer el path del objeto del video y el proyecto
-    full_object_path = data['metadata'][0]['objectPath']
-    project_id = data['metadata'][0]['project']
+    # Extraer la información del video del registro
+    video_record = data['record']
+    video_url = video_record.get('original_url')
+    video_id = video_record.get('id')
     
-    # Eliminar el ID del proyecto del object_path solo para la URL
-    url_path = full_object_path.replace(f"{project_id}/", "", 1)
-    
-    # Construir la URL completa del video usando el formato correcto de Supabase
-    video_url = f"https://{project_id}.supabase.co/storage/v1/object/public/{url_path}"
+    if not video_url:
+        return jsonify({"error": "URL del video no encontrada"}), 400
     
     try:
         # Descargar el video
@@ -258,26 +256,26 @@ def analyze_video():
             
             # Actualizar el registro existente en Supabase
             try:
-                # Buscar el video por su URL original y actualizar el resultado y estado
+                # Actualizar el registro con el resultado del análisis
                 data, error = supabase.table('videos') \
                     .update({
                         "analysis_result": results,
                         "status": "completed"
                     }) \
-                    .eq('original_url', video_url) \
+                    .eq('id', video_id) \
                     .execute()
                 
                 if error:
-                    print(f"Error al actualizar en Supabase: {error}")
+                    logger.error(f"Error al actualizar en Supabase: {error}")
                 elif not data[1] or len(data[1]) == 0:
-                    print(f"No se encontró el video con URL: {video_url}")
+                    logger.error(f"No se encontró el video con ID: {video_id}")
             except Exception as e:
-                print(f"Error al interactuar con Supabase: {str(e)}")
+                logger.error(f"Error al interactuar con Supabase: {str(e)}")
                 # Intentar actualizar solo el estado a fallido
                 try:
                     supabase.table('videos') \
                         .update({"status": "failed"}) \
-                        .eq('original_url', video_url) \
+                        .eq('id', video_id) \
                         .execute()
                 except:
                     pass
@@ -287,7 +285,7 @@ def analyze_video():
             
             return jsonify({
                 "success": True,
-                "video_url": video_url,
+                "video_id": video_id,
                 "analysis": results
             })
         except Exception as e:
@@ -295,7 +293,7 @@ def analyze_video():
             try:
                 supabase.table('videos') \
                     .update({"status": "failed"}) \
-                    .eq('original_url', video_url) \
+                    .eq('id', video_id) \
                     .execute()
             except:
                 pass
@@ -309,7 +307,7 @@ def analyze_video():
         try:
             supabase.table('videos') \
                 .update({"status": "failed"}) \
-                .eq('original_url', video_url) \
+                .eq('id', video_id) \
                 .execute()
         except:
             pass
