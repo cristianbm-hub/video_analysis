@@ -9,6 +9,15 @@ import numpy as np
 from supabase import create_client, Client
 from datetime import datetime
 import json
+import logging
+
+# Configuración del logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 # Configuración de Supabase
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -217,6 +226,12 @@ def health_check():
 
 @app.route('/analyze', methods=['POST'])
 def analyze_video():
+    # Imprimir detalles de la petición
+    logger.info("=== Detalles de la petición HTTP ===")
+    logger.info(f"Headers: {dict(request.headers)}")
+    logger.info(f"Body: {request.get_data(as_text=True)}")
+    logger.info("==================================")
+    
     data = request.json
     
     # Verificar si los datos tienen el formato correcto de Supabase
